@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'history_screen.dart';
+import 'result_screen.dart';
+import '../services/api_service.dart';
+import '../services/token_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -11,9 +14,10 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
 
   int _selectedIndex = 0;
+  bool isLoading = false;
 
-  // Controllers for Prediction Form
   final _formKey = GlobalKey<FormState>();
+
   final pregnanciesController = TextEditingController();
   final glucoseController = TextEditingController();
   final bpController = TextEditingController();
@@ -23,17 +27,17 @@ class _HomeScreenState extends State<HomeScreen> {
   final dpfController = TextEditingController();
   final ageController = TextEditingController();
 
-  // Tab Screens
-  late List<Widget> _pages;
-
   @override
-  void initState() {
-    super.initState();
-
-    _pages = [
-      _predictionForm(), // Prediction Form Tab
-      const HistoryScreen(), // History Tab
-    ];
+  void dispose() {
+    pregnanciesController.dispose();
+    glucoseController.dispose();
+    bpController.dispose();
+    skinController.dispose();
+    insulinController.dispose();
+    bmiController.dispose();
+    dpfController.dispose();
+    ageController.dispose();
+    super.dispose();
   }
 
   void _onItemTapped(int index) {
@@ -64,26 +68,62 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void predictRisk() {
-    if (_formKey.currentState!.validate()) {
-      Map<String, dynamic> data = {
-        "pregnancies": pregnanciesController.text,
-        "glucose": glucoseController.text,
-        "blood_pressure": bpController.text,
-        "skin_thickness": skinController.text,
-        "insulin": insulinController.text,
-        "bmi": bmiController.text,
-        "dpf": dpfController.text,
-        "age": ageController.text,
-      };
-      print(data);
+  Future<void> predictRisk() async {
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Prediction request sent (dummy)"),
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+
+      String? token = await TokenService.getToken();
+      print("TOKEN: $token");
+
+      List features = [
+        int.parse(pregnanciesController.text),
+        int.parse(glucoseController.text),
+        int.parse(bpController.text),
+        int.parse(skinController.text),
+        int.parse(insulinController.text),
+        double.parse(bmiController.text),
+        double.parse(dpfController.text),
+        int.parse(ageController.text),
+      ];
+
+      final result = await ApiService.predict(features, token!);
+
+      print("PREDICT RESPONSE: $result");
+
+      // ✅ FIXED
+      String prediction =
+      result["prediction"] == 1 ? "Diabetic" : "Non-Diabetic";
+
+      double probability = (result["risk"] ?? 0) / 100;
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ResultScreen(
+            prediction: prediction,
+            probability: probability,
+          ),
         ),
       );
+
+    } catch (e) {
+
+      print("PREDICT ERROR: $e");
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Prediction failed: $e")),
+      );
     }
+
+    setState(() {
+      isLoading = false;
+    });
   }
 
   Widget _predictionForm() {
@@ -109,8 +149,10 @@ class _HomeScreenState extends State<HomeScreen> {
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
-                onPressed: predictRisk,
-                child: const Text(
+                onPressed: isLoading ? null : predictRisk,
+                child: isLoading
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text(
                   "Predict Diabetes Risk",
                   style: TextStyle(fontSize: 18),
                 ),
@@ -132,7 +174,9 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: Colors.blue,
       ),
 
-      body: _pages[_selectedIndex],
+      body: _selectedIndex == 0
+          ? _predictionForm()
+          : const HistoryScreen(),
 
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,

@@ -1,37 +1,68 @@
 import 'package:flutter/material.dart';
+import '../services/api_service.dart';
+import '../services/token_service.dart';
 
-class HistoryScreen extends StatelessWidget {
+class HistoryScreen extends StatefulWidget {
   const HistoryScreen({Key? key}) : super(key: key);
 
-  final List<Map<String, dynamic>> historyData = const [
+  @override
+  State<HistoryScreen> createState() => _HistoryScreenState();
+}
 
-    {
-      "date": "10 March 2026",
-      "glucose": 150,
-      "age": 45,
-      "prediction": "High Risk"
-    },
+class _HistoryScreenState extends State<HistoryScreen> {
 
-    {
-      "date": "05 March 2026",
-      "glucose": 110,
-      "age": 30,
-      "prediction": "Low Risk"
-    },
+  List history = [];
+  bool isLoading = true;
 
-    {
-      "date": "01 March 2026",
-      "glucose": 135,
-      "age": 38,
-      "prediction": "Moderate Risk"
-    },
+  @override
+  void initState() {
+    super.initState();
+    loadHistory();
+  }
 
-  ];
+  Future<void> loadHistory() async {
 
-  Color getRiskColor(String risk) {
-    if (risk == "Low Risk") {
+    try {
+
+      String? token = await TokenService.getToken();
+
+      final result = await ApiService.getHistory(token!);
+
+      print("HISTORY DATA: $result"); // 🔥 debug
+
+      setState(() {
+        history = result;
+        isLoading = false;
+      });
+
+    } catch (e) {
+
+      print("HISTORY ERROR: $e");
+
+      setState(() {
+        isLoading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Failed to load history")),
+      );
+    }
+  }
+
+  String getRiskLevel(double probability) {
+    if (probability < 0.3) {
+      return "Low Risk";
+    } else if (probability < 0.6) {
+      return "Moderate Risk";
+    } else {
+      return "High Risk";
+    }
+  }
+
+  Color getRiskColor(double probability) {
+    if (probability < 0.3) {
       return Colors.green;
-    } else if (risk == "Moderate Risk") {
+    } else if (probability < 0.6) {
       return Colors.orange;
     } else {
       return Colors.red;
@@ -41,85 +72,68 @@ class HistoryScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
 
-    return Scaffold(
+    if (isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
 
-      appBar: AppBar(
-        title: const Text("Prediction History"),
-      ),
+    if (history.isEmpty) {
+      return const Center(
+        child: Text("No prediction history found"),
+      );
+    }
 
-      body: ListView.builder(
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: history.length,
+      itemBuilder: (context, index) {
 
-        padding: const EdgeInsets.all(16),
+        final item = history[index];
 
-        itemCount: historyData.length,
+        // ✅ FIXED
+        double probability = (item["risk"] ?? 0) / 100;
 
-        itemBuilder: (context, index) {
+        String prediction =
+        item["prediction"] == 1 ? "Diabetic" : "Non-Diabetic";
 
-          final item = historyData[index];
-          final riskColor = getRiskColor(item["prediction"]);
+        String riskLevel = getRiskLevel(probability);
+        Color riskColor = getRiskColor(probability);
 
-          return Card(
-            elevation: 4,
-            margin: const EdgeInsets.only(bottom: 16),
-
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+        return Card(
+          key: ValueKey(item["_id"]), // ✅ important fix
+          margin: const EdgeInsets.only(bottom: 12),
+          child: ListTile(
+            leading: Icon(
+              Icons.medical_services,
+              color: riskColor,
             ),
 
-            child: Padding(
-              padding: const EdgeInsets.all(16),
+            title: Text(prediction),
 
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Probability: ${(probability * 100).toStringAsFixed(1)}%",
+                ),
+                Text(
+                  "Age: ${item["age"]}, Glucose: ${item["glucose"]}",
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ],
+            ),
 
-                children: [
-
-                  Text(
-                    item["date"],
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey,
-                    ),
-                  ),
-
-                  const SizedBox(height: 10),
-
-                  Text(
-                    "Glucose: ${item["glucose"]}",
-                    style: const TextStyle(fontSize: 16),
-                  ),
-
-                  Text(
-                    "Age: ${item["age"]}",
-                    style: const TextStyle(fontSize: 16),
-                  ),
-
-                  const SizedBox(height: 10),
-
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        vertical: 6, horizontal: 12),
-
-                    decoration: BoxDecoration(
-                      color: riskColor.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-
-                    child: Text(
-                      item["prediction"],
-                      style: TextStyle(
-                        color: riskColor,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  )
-
-                ],
+            trailing: Text(
+              riskLevel,
+              style: TextStyle(
+                color: riskColor,
+                fontWeight: FontWeight.bold,
               ),
             ),
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 }

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'history_screen.dart'; // HistoryScreen import
+import 'history_screen.dart';
 
 class ResultScreen extends StatelessWidget {
 
@@ -42,6 +42,7 @@ class ResultScreen extends StatelessWidget {
 
       appBar: AppBar(
         title: const Text("Prediction Result"),
+        backgroundColor: Colors.blue,
       ),
 
       body: Center(
@@ -92,7 +93,8 @@ class ResultScreen extends StatelessWidget {
                   const SizedBox(height: 20),
 
                   Container(
-                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 10, horizontal: 20),
                     decoration: BoxDecoration(
                       color: riskColor.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(12),
@@ -109,7 +111,6 @@ class ResultScreen extends StatelessWidget {
 
                   const SizedBox(height: 30),
 
-                  // Check Again Button
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
@@ -122,7 +123,6 @@ class ResultScreen extends StatelessWidget {
 
                   const SizedBox(height: 15),
 
-                  // View History Button
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
